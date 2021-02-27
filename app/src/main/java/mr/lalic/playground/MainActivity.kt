@@ -14,6 +14,8 @@ import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme.typography
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -22,8 +24,32 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.*
+import kotlinx.coroutines.launch
+import java.util.*
 
-class MainActivity : AppCompatActivity() {
+class MainViewModel : ViewModel() {
+    fun populateWithData() {
+        viewModelScope.launch {
+            _dataSet.postValue(fullList)
+        }
+    }
+
+    fun changeMarkoToDarko() {
+        viewModelScope.launch {
+            _dataSet.value?.let {
+                it.map { name ->
+                    if (name == "Marko") {
+                        name.toUpperCase(Locale.ROOT)
+                    }
+                }
+            }
+            _dataSet.postValue(_dataSet.value)
+        }
+    }
+
+    private val _dataSet = MutableLiveData<List<String>>(emptyList())
+    val dataSet: LiveData<List<String>> = _dataSet
 
     val fullList = arrayListOf(
         "Marko",
@@ -35,21 +61,27 @@ class MainActivity : AppCompatActivity() {
         "Ruza",
         "Jovana"
     )
-    var dataSet = fullList
+}
 
+class MainActivity : AppCompatActivity() {
+
+    lateinit var mainViewModel: MainViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        mainViewModel = ViewModelProvider(this).get(MainViewModel::class.java)
+
         setContent {
-            var myData = dataSet
             Greeting(
-                dataSet = myData,
+                viewModel = mainViewModel,
                 showMessage = {
                     Toast.makeText(this, "$it", Toast.LENGTH_SHORT).show()
-                    myData[3] = "hohoho"
+                    if (it == "Marko") {
+                        mainViewModel.changeMarkoToDarko()
+                    }
                 },
                 populateWithData = {
-                    dataSet.addAll(fullList)
+                    mainViewModel.populateWithData()
                 }
             )
         }
@@ -57,27 +89,12 @@ class MainActivity : AppCompatActivity() {
 }
 
 @Composable
-fun getData(): List<String> {
-    return arrayListOf(
-        "Marko",
-        "suzana",
-        "Leonora",
-        "Danijela",
-        "Andrea",
-        "Radovan",
-        "Ruza",
-        "Jovana"
-    )
-}
-
-@Composable
 fun Greeting(
-    dataSet: List<String>,
+    viewModel: MainViewModel,
     showMessage: ((String) -> Unit)? = null,
     populateWithData: (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.padding(10.dp)) {
-
         Image(
             painter = painterResource(id = R.drawable.header),
             contentDescription = null,
@@ -113,14 +130,15 @@ fun Greeting(
 
         Spacer(Modifier.height(16.dp))
 
+        val myData: List<String> by viewModel.dataSet.observeAsState(emptyList())
+
         NamePicker(
             header = "Names",
-            names = dataSet,
+            names = myData,
             onNameClicked = {
                 showMessage?.invoke(it)
                 if (it == "empty") {
                     populateWithData?.invoke()
-
                 }
             }
         )
@@ -183,7 +201,7 @@ private fun NameItem(name: String, onClicked: (String) -> Unit) {
     Text(
         text = name,
         style = typography.h3,
-        color = Color.White,
+        color = Color.Blue,
         modifier = Modifier.clickable(onClick = { onClicked(name) })
     )
 }
@@ -191,5 +209,5 @@ private fun NameItem(name: String, onClicked: (String) -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    Greeting(emptyList())
+//    Greeting(viewModel())
 }
